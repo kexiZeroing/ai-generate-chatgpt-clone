@@ -18,12 +18,12 @@
               <VueMarkdownIt v-else :source="msg.content" />
             </div>
           </div>
-          <div v-if="loading" class="loading-message">
-            <p>AI is thinking...</p>
+          <div v-if="isStreaming" class="streaming-message">
+            <p>AI is responding...</p>
           </div>
         </div>
       </div>
-      <ChatInput @send-message="handleMessage" :loading="loading" />
+      <ChatInput @send-message="handleMessage" :disabled="isStreaming" />
     </main>
     <footer>
       <p>ChatGPT clone powered by Ollama. Responses may not be accurate.</p>
@@ -46,12 +46,12 @@ const suggestions = ref([
 ]);
 
 const messages = ref([]);
-const loading = ref(false);
+const isStreaming = ref(false);
 const chatContainer = ref(null);
 
 const handleMessage = async (message) => {
   messages.value.push({ type: 'user-message', content: message });
-  loading.value = true;
+  isStreaming.value = true;
 
   try {
     const response = await fetch('/api/chat', {
@@ -61,18 +61,33 @@ const handleMessage = async (message) => {
       },
       body: JSON.stringify({ message }),
     });
-    const data = await response.json();
-    
-    if (data.error) {
-      throw new Error(data.error);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let aiMessage = { type: 'ai-message', content: '' };
+    messages.value.push(aiMessage);
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value, { stream: true });
+      aiMessage.content += chunk;
+      
+      // Force a re-render
+      messages.value = [...messages.value];
+      
+      // Scroll to bottom
+      await nextTick();
+      if (chatContainer.value) {
+        chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+      }
     }
-    
-    messages.value.push({ type: 'ai-message', content: data.reply });
   } catch (error) {
     console.error('Error sending message:', error);
     messages.value.push({ type: 'error-message', content: 'Failed to get response. Please try again.' });
   } finally {
-    loading.value = false;
+    isStreaming.value = false;
   }
 };
 
