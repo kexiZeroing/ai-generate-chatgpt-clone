@@ -11,11 +11,13 @@ This project is a simple ChatGPT clone with a Vue.js frontend and a Hono.js back
 
 The frontend will be available at `http://localhost:5173` and the backend at `http://localhost:3000`.
 
-## Features
+```sh
+cd backend
+npm run dev
 
-- Chat interface similar to ChatGPT
-- Suggestion boxes for quick prompts
-- Real-time communication between frontend and backend
+cd frontend
+npm run dev
+```
 
 ## Contributing
 

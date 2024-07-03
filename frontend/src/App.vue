@@ -3,14 +3,6 @@
     <Header />
     <main>
       <div class="content">
-        <div class="suggestion-boxes" v-if="messages.length === 0">
-          <SuggestionBox 
-            v-for="suggestion in suggestions" 
-            :key="suggestion.id" 
-            :suggestion="suggestion"
-            @click="handleSuggestion(suggestion.text)"
-          />
-        </div>
         <div class="chat-messages" ref="chatContainer">
           <div v-for="(msg, index) in messages" :key="index" :class="msg.type">
             <div class="message-content">
@@ -34,16 +26,8 @@
 <script setup>
 import { ref, onUpdated, nextTick } from 'vue';
 import Header from './components/Header.vue';
-import SuggestionBox from './components/SuggestionBox.vue';
 import ChatInput from './components/ChatInput.vue';
 import { VueMarkdownIt } from '@f3ve/vue-markdown-it';
-
-const suggestions = ref([
-  { id: 1, icon: '💡', text: 'What to do with kids\' art' },
-  { id: 2, icon: '🗺️', text: 'Experience Seoul like a local' },
-  { id: 3, icon: '🦈', text: 'Superhero shark story' },
-  { id: 4, icon: '🌐', text: 'Make me a personal webpage' },
-]);
 
 const messages = ref([]);
 const isStreaming = ref(false);
@@ -99,10 +83,6 @@ const handleMessage = async (message) => {
   }
 };
 
-const handleSuggestion = (text) => {
-  handleMessage(text);
-};
-
 onUpdated(() => {
   nextTick(() => {
     if (chatContainer.value) {
@@ -136,12 +116,6 @@ main {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.suggestion-boxes {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
 }
 
 .chat-messages {
