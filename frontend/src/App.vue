@@ -18,12 +18,12 @@
               <VueMarkdownIt v-else :source="msg.content" />
             </div>
           </div>
-          <div v-if="isStreaming" class="streaming-message">
-            <p>AI is responding...</p>
+          <div v-if="isLoading" class="loading-message">
+            <p>Loading<span class="loading-indicator">...</span></p>
           </div>
         </div>
       </div>
-      <ChatInput @send-message="handleMessage" :disabled="isStreaming" />
+      <ChatInput @send-message="handleMessage" :disabled="isStreaming || isLoading" />
     </main>
     <footer>
       <p>ChatGPT clone powered by Ollama. Responses may not be accurate.</p>
@@ -49,45 +49,53 @@ const messages = ref([]);
 const isStreaming = ref(false);
 const chatContainer = ref(null);
 
+const isLoading = ref(false);
+
 const handleMessage = async (message) => {
   messages.value.push({ type: 'user-message', content: message });
-  isStreaming.value = true;
+  isLoading.value = true;
+
+  let eventSource;
 
   try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message }),
-    });
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    eventSource = new EventSource(`/api/chat-stream?message=${encodeURIComponent(message)}`);
     let aiMessage = { type: 'ai-message', content: '' };
     messages.value.push(aiMessage);
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    eventSource.onmessage = (event) => {
+      if (isLoading.value) isLoading.value = false;
+      isStreaming.value = true;
       
-      const chunk = decoder.decode(value, { stream: true });
-      aiMessage.content += chunk;
+      aiMessage.content += event.data;
       
       // Force a re-render
       messages.value = [...messages.value];
       
       // Scroll to bottom
-      await nextTick();
-      if (chatContainer.value) {
-        chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-      }
-    }
+      nextTick(() => {
+        if (chatContainer.value) {
+          chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+        }
+      });
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE Error:', error);
+      eventSource.close();
+      isStreaming.value = false;
+      isLoading.value = false;
+    };
+
+    eventSource.addEventListener('close', () => {
+      eventSource.close();
+      isStreaming.value = false;
+      isLoading.value = false;
+    });
   } catch (error) {
     console.error('Error sending message:', error);
     messages.value.push({ type: 'error-message', content: 'Failed to get response. Please try again.' });
-  } finally {
     isStreaming.value = false;
+    isLoading.value = false;
   }
 };
 
@@ -174,12 +182,6 @@ footer {
   padding: 10px;
   font-size: 0.8em;
   color: #888;
-}
-
-.loading-message {
-  align-self: center;
-  color: #888;
-  font-style: italic;
 }
 
 .message-content :deep(pre) {
