@@ -41,8 +41,11 @@ const handleMessage = async (message) => {
 
   let eventSource;
 
+  // normal chat or rag
+  const endpoint = location.href.includes('?rag') ? 'rag-chat' : 'chat-stream';
+
   try {
-    eventSource = new EventSource(`/api/chat-stream?message=${encodeURIComponent(message)}`);
+    eventSource = new EventSource(`/api/${endpoint}?message=${encodeURIComponent(message)}`);
     let aiMessage = { type: 'ai-message', content: '' };
     messages.value.push(aiMessage);
 
