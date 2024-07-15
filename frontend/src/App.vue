@@ -3,6 +3,13 @@
     <Header />
     <main>
       <div class="content">
+        <div class="file-upload">
+          <p>Upload a document to try RAG or just type to chat</p>
+          <input type="file" @change="handleFileUpload" accept=".txt" />
+          <button @click="uploadFile" :disabled="!selectedFile || isUploading">
+            {{ isUploading ? 'Uploading...' : 'Upload' }}
+          </button>
+        </div>
         <div class="chat-messages" ref="chatContainer">
           <div v-for="(msg, index) in messages" :key="index" :class="msg.type">
             <div class="message-content">
@@ -28,12 +35,44 @@ import { ref, onUpdated, nextTick } from 'vue';
 import Header from './components/Header.vue';
 import ChatInput from './components/ChatInput.vue';
 import { VueMarkdownIt } from '@f3ve/vue-markdown-it';
+// import { useRouter } from 'vue-router'
+
+// const router = useRouter();
 
 const messages = ref([]);
 const isStreaming = ref(false);
 const chatContainer = ref(null);
 
 const isLoading = ref(false);
+const selectedFile = ref(null);
+const isUploading = ref(false);
+
+const handleFileUpload = (event) => {
+  selectedFile.value = event.target.files[0];
+};
+
+const uploadFile = async () => {
+  if (!selectedFile.value) return;
+
+  const formData = new FormData();
+  formData.append('file', selectedFile.value);
+
+  isUploading.value = true;
+  try {
+    await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const url = new URL(window.location);
+    url.searchParams.set('rag', 'true');
+    window.history.replaceState({}, '', `${window.location.pathname}?${url.searchParams.toString()}`);
+  } catch (error) {
+    console.error('Error uploading file:', error);
+  } finally {
+    isUploading.value = false;
+  }
+};
 
 const handleMessage = async (message) => {
   messages.value.push({ type: 'user-message', content: message });

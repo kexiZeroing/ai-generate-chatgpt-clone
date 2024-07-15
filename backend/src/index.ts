@@ -13,6 +13,9 @@ import * as hub from "langchain/hub"
 import { RunnableSequence } from "@langchain/core/runnables"
 import { formatDocumentsAsString } from "langchain/util/document"
 
+import fs from "node:fs/promises"
+import path from "node:path"
+
 const app = new Hono()
 const ollama = new Ollama()
 
@@ -22,11 +25,11 @@ app.use(cors())
 let vectorStore
 let ragChain: any
 
-async function initializeRAG() {
+async function initializeRAG(filePath = "abramov.txt") {
   console.log("RAG initializing")
 
   // 1. Load
-  const loader = new TextLoader("abramov.txt")
+  const loader = new TextLoader(filePath)
   const docs = await loader.load()
 
   // 2. Split
@@ -65,7 +68,7 @@ async function initializeRAG() {
   ragChain = RunnableSequence.from([
     {
       context: retriever.pipe(formatDocumentsAsString),
-      question: (input) => input.question,
+      question: (input: any) => input.question,
     },
     prompt,
     llm,
@@ -74,9 +77,9 @@ async function initializeRAG() {
 }
 
 // Initialize RAG on server start
-initializeRAG().then(async () => {
-  console.log("RAG initialized")
-})
+// initializeRAG().then(async () => {
+//   console.log("RAG initialized")
+// })
 
 app.get('/', (c) => {
   return c.json({ message: 'Hello from Hono backend!' })
@@ -136,6 +139,35 @@ app.get('/rag-chat', async (c) => {
       stream.close()
     }
   })
+})
+
+// accept rag txt file upload
+app.post('/upload', async (c) => {
+  const file = await c.req.formData()
+  const uploadedFile = file.get('file') as File
+
+  if (!uploadedFile) {
+    return c.json({ error: 'No file uploaded' }, 400)
+  }
+
+  const filePath = path.join(__dirname, '../uploads', uploadedFile.name)
+  
+  try {
+    // Save the file
+    const arrayBuffer = await uploadedFile.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    await fs.writeFile(filePath, buffer)
+
+    // Initialize RAG with the uploaded file
+    await initializeRAG(filePath).then(async () => {
+      console.log("RAG initialized")
+    })
+
+    return c.json({ message: 'File uploaded and processed successfully' })
+  } catch (error) {
+    console.error('Error processing upload:', error)
+    return c.json({ error: 'Failed to process uploaded file' }, 500)
+  }
 })
 
 const port = 3000
